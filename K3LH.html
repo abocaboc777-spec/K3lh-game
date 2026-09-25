@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TJKT Cyber Ops: Advanced K3LH AI Evaluator</title>
+    <style>
+        :root {
+            --bg: #050b14;
+            --card: #0f172a;
+            --border: #1e293b;
+            --primary: #38bdf8;
+            --accent: #f59e0b;
+            --success: #10b981;
+            --danger: #ef4444;
+            --text: #f8fafc;
+            --muted: #94a3b8;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; user-select: none; }
+        body { background-color: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 12px; }
+
+        .terminal {
+            width: 100%; max-width: 500px; background: var(--card); border: 2px solid var(--border);
+            border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.8); overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        .header { background: linear-gradient(135deg, #0369a1, #0284c7); padding: 15px; text-align: center; border-bottom: 2px solid #0ea5e9; }
+        .header h1 { font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px; }
+        .header p { font-size: 0.75rem; opacity: 0.85; margin-top: 2px; }
+
+        .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); background: #090d16; padding: 10px; text-align: center; font-size: 0.75rem; border-bottom: 1px solid var(--border); font-weight: bold; }
+        .stat-item span { display: block; font-size: 0.85rem; margin-top: 2px; }
+
+        .body-content { padding: 20px; display: flex; flex-direction: column; gap: 15px; }
+        .screen { display: none; flex-direction: column; gap: 15px; }
+        .screen.active { display: flex; }
+
+        .case-box {
+            background: #090d16; border: 1px dashed #334155; border-radius: 10px; padding: 12px; font-size: 0.85rem; color: var(--muted);
+            display: flex; justify-content: space-between; align-items: center; text-transform: uppercase; font-weight: bold;
+        }
+
+        .scenario-text {
+            background: #172033; border-left: 4px solid var(--primary); padding: 14px; border-radius: 0 10px 10px 0;
+            font-size: 0.95rem; line-height: 1.5; color: #f1f5f9;
+        }
+
+        textarea {
+            width: 100%; height: 100px; background: #090d16; border: 2px solid var(--border); border-radius: 10px;
+            padding: 12px; color: var(--text); font-size: 0.9rem; resize: none; outline: none; transition: border 0.2s;
+        }
+        textarea:focus { border-color: var(--primary); }
+
+        .btn {
+            background: linear-gradient(135deg, var(--primary), #0284c7); color: #050b14; border: none; padding: 14px;
+            border-radius: 10px; font-weight: bold; font-size: 1rem; cursor: pointer; text-align: center; width: 100%;
+            box-shadow: 0 4px 15px rgba(56, 189, 248, 0.3); transition: opacity 0.2s;
+        }
+        .btn:hover { opacity: 0.9; }
+
+        /* AI Feedback Modal */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 11, 20, 0.9);
+            display: none; justify-content: center; align-items: center; padding: 20px; z-index: 100; backdrop-filter: blur(5px);
+        }
+        .modal-card {
+            background: var(--card); width: 100%; max-width: 400px; padding: 25px; border-radius: 16px; border: 2px solid var(--border);
+            display: flex; flex-direction: column; gap: 15px; animation: popUp 0.3s ease;
+        }
+        @keyframes popUp { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+        .ai-badge { display: inline-block; background: rgba(56, 189, 248, 0.15); color: var(--primary); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; font-weight: bold; align-self: flex-start; }
+        .ai-result-title { font-size: 1.1rem; font-weight: bold; }
+        .ai-desc { font-size: 0.85rem; color: var(--muted); line-height: 1.4; background: #090d16; padding: 12px; border-radius: 8px; }
+
+        .center-box { text-align: center; display: flex; flex-direction: column; gap: 15px; padding: 15px 0; }
+        .big-icon { font-size: 4rem; }
+    </style>
+</head>
+<body>
+
+    <div class="terminal">
+        <div class="header">
+            <h1>TJKT Smart AI Evaluator</h1>
+            <p>Sistem Analisis Jawaban Terbuka K3LH Industri</p>
+        </div>
+
+        <div class="stats-bar" id="statsBar" style="display: none;">
+            <div class="stat-item">KASUS <span id="currentCaseNum">1 / 50</span></div>
+            <div class="stat-item">SKOR RATA-RATA <span id="currentScore">100</span></div>
+            <div class="stat-item">STATUS <span style="color: var(--success);" id="statusText">AMAN</span></div>
+        </div>
+
+        <div class="body-content">
+            <!-- START SCREEN -->
+            <div id="startScreen" class="screen active center-box">
+                <div class="big-icon">🌐🤖</div>
+                <h2 style="color: var(--primary);">Simulasi Ujian K3LH AI</h2>
+                <p style="font-size: 0.85rem; color: var(--muted); line-height: 1.5;">
+                    Sistem ini dilengkapi dengan <b>AI Semantic Matcher</b>. Kamu bebas mengetik jawaban dengan bahasamu sendiri. AI akan menilai apakah logika penanganan k3-mu sudah masuk akal atau berbahaya!
+                </p>
+                <input type="text" id="studentName" placeholder="Masukkan Nama Siswa TJKT..." style="background: #090d16; border: 2px solid var(--border); padding: 12px; border-radius: 10px; color: white; text-align: center; outline: none;">
+                <button class="btn" onclick="startSimulation()">Mulai Evaluasi AI 🚀</button>
+            </div>
+
+            <!-- GAME / QUIZ SCREEN -->
+            <div id="quizScreen" class="screen">
+                <div class="case-box">
+                    <span id="caseModule">MODUL KELISTRIKAN</span>
+                    <span style="color: var(--accent);">Poin Target</span>
+                </div>
+                <div class="scenario-text" id="scenarioText">
+                    Memuat skenario krisis...
+                </div>
+                <textarea id="userAnswerInput" placeholder="Ketik tindakan K3LH selengkap dan seakurat mungkin (misal: matikan mcb, gunakan apar co2, dll)..."></textarea>
+                <button class="btn" onclick="submitAnswer()">Kirim ke AI Evaluator ⚡</button>
+            </div>
+
+            <!-- RESULT SCREEN -->
+            <div id="endScreen" class="screen center-box">
+                <div class="big-icon" id="endIcon">🏆</div>
+                <h2 id="endTitle">Ujian Selesai</h2>
+                <p id="endDesc" style="font-size: 0.85rem; color: var(--muted); line-height: 1.5;">Menghitung rekapitulasi...</p>
+                <button class="btn" onclick="location.reload()">Ulangi Sesi 🔄</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI FEEDBACK MODAL -->
+    <div class="modal" id="aiModal">
+        <div class="modal-card">
+            <span class="ai-badge">🤖 AI SEMANTIC ANALYZER</span>
+            <div class="ai-result-title" id="modalTitle">Hasil Penilaian</div>
+            <div class="ai-desc" id="modalDesc">Analisis jawaban...</div>
+            <button class="btn" onclick="nextScenario()">Lanjut Kasus Berikutnya ➡️</button>
+        </div>
+    </div>
+
+    <script>
+        // Database 50 Kasus Komprehensif K3LH TJKT dengan Sinonim Konseptual (AI-Smart Logic)
+        const databaseKasus = [
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Rak server utama korsleting dan mengeluarkan percikan api. Anak magang mau menyiramnya dengan air. Tindakan K3LH kamu?",
+                coreConcepts: ["mcb", "listrik", "utama", "apar", "co2", "padam", "putus", "cabut", "listrik"],
+                ideal: "Memutus aliran listrik utama (MCB) terlebih dahulu, evakuasi, dan memadamkan pakai APAR jenis CO2 (bukan air)."
+            },
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Kabel power server terkelupas dan serabut tembaganya terlihat di lantai lab basah. Tindakan K3?",
+                coreConcepts: ["ganti", "isolasi", "matikan", "kabel", "lapor", "putus", "aliran"],
+                ideal: "Mematikan aliran listrik pada jalur tersebut, lalu mengisolasi ulang atau mengganti kabel yang rusak."
+            },
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Mengapa teknisi dilarang memperbaiki perangkat berarus listrik dalam keadaan tangan basah?",
+                coreConcepts: ["air", "konduktor", "kesetrum", "hantar", "tahanan", "tubuh", "basah"],
+                ideal: "Air menurunkan hambatan listrik kulit sehingga tubuh sangat mudah tersengat arus listrik fatal."
+            },
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Sebelum melakukan perbaikan pada Switch/Router di rack, prosedur pengamanan power apa yang wajib dilakukan?",
+                coreConcepts: ["matikan", "power", "cabut", "stop", "kontak", "off", "sambung"],
+                ideal: "Mematikan perangkat dan mencabut kabel power dari stop kontak (unplug)."
+            },
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Apa bahaya menumpuk banyak colokan (T-deker) pada satu stop kontak rack server berdaya besar?",
+                coreConcepts: ["beban", "lebih", "overload", "panas", "terbakar", "korsleting"],
+                ideal: "Menyebabkan kelebihan beban (overload), panas berlebih, dan memicu kebakaran."
+            },
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Siswa menggunakan obeng bergagang besi tipis rusak untuk memperbaiki power supply menyala. Nasihatmu?",
+                coreConcepts: ["isolasi", "ganti", "berisolasi", "obeng", "setrum", "bahaya"],
+                ideal: "Menggunakan obeng berisolasi khusus kelistrikan agar terhindar dari sengatan."
+            },
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Jenis APAR apa yang paling aman untuk memadamkan kebakaran perangkat elektronik (Kelas C)?",
+                coreConcepts: ["co2", "karbon", "dioksida", "dry", "powder", "serbuk"],
+                ideal: "APAR jenis Gas Karbon Dioksida (CO2) atau Serbuk Kimia Kering (Dry Powder)."
+            },
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Mengapa lantai ruang server profesional umumnya menggunakan lantai terangkat (raised floor)?",
+                coreConcepts: ["kabel", "sirkulasi", "udara", "statis", "rapi", "pendingin"],
+                ideal: "Untuk merapikan jalur kabel di bawahnya dan melancarkan sirkulasi udara pendingin."
+            },
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Apa fungsi utama UPS (Uninterruptible Power Supply) dari sudut pandang keselamatan data?",
+                coreConcepts: ["cadangan", "data", "rusak", "stabil", "mati", "mendadak"],
+                ideal: "Memberikan daya cadangan sementara agar data tidak korup dan server shutdown aman."
+            },
+            {
+                modul: "Kelistrikan Server",
+                kasus: "Bagaimana aturan peletakan stop kontak terhadap posisi jalur pipa air atau AC di ruang lab?",
+                coreConcepts: ["jauh", "air", "bocor", "aman", "posisi", "tinggi"],
+                ideal: "Stop kontak harus ditempatkan jauh dari potensi tetesan atau kebocoran air AC."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Kamu harus memasang Access Point di atas tower setinggi 15 meter. APD utama apa yang wajib terpakai?",
+                coreConcepts: ["harness", "full", "body", "sabuk", "pengaman", "tali"],
+                ideal: "Full Body Harness yang dikaitkan kuat ke struktur menara tower."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Saat akan memanjat tower, cuaca mendadak mendung gelap dan terdengar petir. Keputusan K3?",
+                coreConcepts: ["tunda", "batal", "petir", "cuaca", "bahaya", "lanjut"],
+                ideal: "Menunda atau membatalkan pemanjatan karena risiko tersambar petir di ketinggian."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Apa fungsi utama Helm Safety saat melakukan instalasi jaringan di luar ruangan (outdoor)?",
+                coreConcepts: ["kepala", "benturan", "jatuh", "benda", "lindungi"],
+                ideal: "Melindungi kepala dari benturan benda keras atau kejatuhan peralatan kerja."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Saat memakai tangga lipat untuk merapikan kabel di plafon, apa syarat posisi tangga yang aman?",
+                coreConcepts: ["rata", "stabil", "kunci", "pegang", "lantai"],
+                ideal: "Diletakkan di bidang rata, terkunci benar, dan ada rekan yang memegang bagian bawah."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Kenapa teknisi dilarang membawa tas peralatan terlalu berat saat memanjat tower?",
+                coreConcepts: ["keseimbangan", "jatuh", "beban", "tangan", "pegang"],
+                ideal: "Dapat mengganggu keseimbangan tubuh dan meningkatkan risiko jatuh dari ketinggian."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Sepatu jenis apa yang wajib dikenakan teknisi saat bekerja di lapangan konstruksi/tower?",
+                coreConcepts: ["sepatu", "safety", "ujung", "besi", "slip", "lindungi"],
+                ideal: "Sepatu safety berujung baja (steel toe cap) dengan sol anti-slip."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Apa yang dimaksud teknik 'Double Lanyard' bagi pekerja di atas tower telekomunikasi?",
+                coreConcepts: ["tali", "ganda", "kait", "pindah", "aman"],
+                ideal: "Menggunakan dua pengait sabuk secara bergantian agar selalu ada yang terikat."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Kenapa teknisi dilarang bekerja di atas tower seorang diri tanpa pengawas di bawah?",
+                coreConcepts: ["bantuan", "darurat", "tim", "pengawas", "kecelakaan"],
+                ideal: "Agar ada yang segera memberikan pertolongan darurat jika terjadi kecelakaan di atas."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Saat menarik kabel ke atas tower, bagaimana pengamanan jalur dari kabel listrik PLN?",
+                coreConcepts: ["jarak", "aman", "pln", "waspada", "jalur"],
+                ideal: "Memastikan jalur tarikan menjaga jarak aman dari kabel tegangan tinggi PLN."
+            },
+            {
+                modul: "Kerja di Ketinggian",
+                kasus: "Risiko kesehatan apa yang mengintai teknisi outdoor yang bekerja seharian tanpa pelindung panas?",
+                coreConcepts: ["dehidrasi", "panas", "uv", "kulit", "kelelahan"],
+                ideal: "Dehidrasi berat, heat exhaustion, dan kerusakan kulit akibat paparan sinar matahari."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Serpihan kaca (core) sisa potongan Fiber Optic sangat tajam. Bagaimana cara membuangnya yang aman?",
+                coreConcepts: ["wadah", "khusus", "tempat", "sampah", "tertutup"],
+                ideal: "Dimasukkan ke dalam wadah tertutup khusus sisa core fiber (core bin)."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Bahaya apa jika mata melihat langsung sinar laser VFL (Visual Fault Locator) pada kabel fiber optik?",
+                coreConcepts: ["mata", "retina", "laser", "rusak", "buta"],
+                ideal: "Sinar laser intensitas tinggi dapat merusak retina mata secara permanen."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Apa definisi ESD yang dapat merusak komponen mikrokontroler server saat perakitan?",
+                coreConcepts: ["electrostatic", "discharge", "statis", "listrik"],
+                ideal: "Electrostatic Discharge (pelepasan muatan listrik statis dari tubuh yang merusak chip)."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Alat pelindung apa yang wajib dipakai di pergelangan tangan saat merakit motherboard server?",
+                coreConcepts: ["gelang", "antistatik", "strap", "ground"],
+                ideal: "Anti-Static Wrist Strap yang dihubungkan ke ground untuk membuang listrik statis."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Siswa mengeluh leher kaku dan mata lelah setelah 4 jam konfigurasi router. Apa istilah gangguan ini?",
+                coreConcepts: ["ergonomi", "msds", "lelah", "posisi", "duduk"],
+                ideal: "Gangguan ergonomi / Computer Vision Syndrome / MSDs."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Bagaimana posisi ergonomis layar monitor dan kursi lab komputer yang benar?",
+                coreConcepts: ["tegak", "sejajar", "mata", "sandaran", "lantai"],
+                ideal: "Punggung tegak bersandar, layar sejajar mata, telapak kaki menapak rata."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Saat memotong kawat tembaga kecil dengan tang, serpihan sering terpental. APD tambahan apa yang diperlukan?",
+                coreConcepts: ["kaca", "mata", "pelindung", "safety", "glasses"],
+                ideal: "Kacamata pelindung (Safety Glasses) untuk mencegah pecahan logam masuk mata."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Kenapa perkakas tangan (tang/obeng) yang gagangnya rompal tidak boleh digunakan?",
+                coreConcepts: ["peleset", "rusak", "luka", "genggam"],
+                ideal: "Mudah tergelincir saat ditekan kuat dan berisiko melukai tangan."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Aturan penting apa saat meletakkan solder listrik panas yang sedang menyala di meja?",
+                coreConcepts: ["dudukan", "panas", "bakar", "holder"],
+                ideal: "Wajib diletakkan pada dudukan (holder) tahan panas yang stabil."
+            },
+            {
+                modul: "Alat Kerja & ESD",
+                kasus: "Bagaimana teknik mengangkat perangkat UPS berat (25 kg) agar tidak mencederai punggung?",
+                coreConcepts: ["lutut", "tekuk", "punggung", "lurus", "angkat"],
+                ideal: "Tekuk lutut (bukan membungkuk), jaga punggung lurus, andalkan kekuatan kaki."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Baterai UPS lab kembung dan bocor cairan asamnya. Termasuk kategori limbah apakah ini?",
+                coreConcepts: ["b3", "berbahaya", "beracun", "limbah"],
+                ideal: "Limbah B3 (Bahan Berbahaya dan Beracun) yang mengandung timbal dan asam."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Bagaimana prosedur pembuangan baterai UPS rusak (Limbah B3) yang sesuai hukum lingkungan?",
+                coreConcepts: ["vendor", "resmi", "serah", "khusus", "wadah"],
+                ideal: "Disimpan di wadah aman dan diserahkan ke vendor pengolahan limbah B3 resmi."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Dampak buruk jika komponen elektronik atau aki dibuang langsung ke tanah bebas?",
+                coreConcepts: ["tanah", "air", "cemar", "racun", "timbal"],
+                ideal: "Zat kimia beracun akan meresap dan mencemari sumber air serta tanah."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Apa definisi dari konsep 'Green ICT' di dunia jaringan modern?",
+                coreConcepts: ["hemat", "energi", "ramah", "lingkungan", "listrik"],
+                ideal: "Penggunaan perangkat teknologi yang hemat daya dan mendukung kelestarian alam."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Komputer lab dibiarkan menyala non-stop semalaman tanpa aktivitas. Tindakan K3LH/Green ICT?",
+                coreConcepts: ["matikan", "shutdown", "hemat", "listrik", "energi"],
+                ideal: "Mematikan (Shut down) perangkat saat tidak digunakan untuk menghemat energi."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Bagaimana cara menangani sisa potongan kabel LAN/fiber agar lab tetap bersih?",
+                coreConcepts: ["pilah", "sampah", "daur", "ulang", "tempat"],
+                ideal: "Dipilah ke tempat sampah khusus daur ulang logam/kabel."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Kenapa sekolah dilarang membakar sampah plastik pembungkus kabel di area terbuka?",
+                coreConcepts: ["asap", "racun", "udara", "polusi", "napas"],
+                ideal: "Menghasilkan gas dioksin beracun yang mencemari udara dan merusak pernapasan."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Apa tujuan utama penerapan metode 5S (Seiri, Seiton, Seiso, Seiketsu, Shitsuke) di lab TJKT?",
+                coreConcepts: ["rapi", "bersih", "aman", "nyaman", "efisien"],
+                ideal: "Menciptakan lingkungan kerja yang rapi, bersih, aman, dan efisien."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Tindakan darurat jika cairan asam baterai tidak sengaja mengenai kulit tanganmu?",
+                coreConcepts: ["cuci", "air", "mengalir", "bersih", "bilas"],
+                ideal: "Segera bilas dengan air mengalir yang banyak selama minimal 15 menit."
+            },
+            {
+                modul: "Green ICT & B3",
+                kasus: "Mengapa filter AC di ruang server harus dibersihkan secara berkala?",
+                coreConcepts: ["bersih", "filter", "servis", "berkala", "pendingin"],
+                ideal: "Menjaga efisiensi pendinginan listrik dan mencegah overheating perangkat."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Langkah pertama saat mendengar sirene alarm tanda bahaya kebakaran berbunyi di gedung?",
+                coreConcepts: ["evakuasi", "keluar", "titik", "kumpul", "tenang"],
+                ideal: "Tetap tenang, ikuti jalur evakuasi, dan menuju titik kumpul (assembly point)."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Kenapa saat evakuasi darurat kebakaran gedung bertingkat dilarang menggunakan lift?",
+                coreConcepts: ["mati", "listrik", "terjebak", "asap", "tangga"],
+                ideal: "Lift berisiko mati total akibat terputusnya listrik dan membuat orang terjebak."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Apa fungsi utama kotak P3K yang wajib tersedia di setiap bengkel/lab TJKT?",
+                coreConcepts: ["obat", "luka", "pertolongan", "pertama", "darurat"],
+                ideal: "Menyediakan obat dan alat medis dasar untuk penanganan luka ringan."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Temanmu tersetrum dan masih menempel pada kabel beraliran listrik. Tindakan pertamamu?",
+                coreConcepts: ["kayu", "putus", "mcb", "jangan", "sentuh", "benda"],
+                ideal: "Matikan sumber listrik atau dorong korban dengan benda non-konduktor kering (kayu)."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Apa fungsi dari SOP (Standard Operating Procedure) sebelum melakukan konfigurasi jaringan?",
+                coreConcepts: ["atur", "arah", "aman", "sistematis", "prosedur"],
+                ideal: "Panduan langkah kerja sistematis agar aman, terarah, dan meminimalkan kesalahan."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Kenapa siswa dilarang membawa makanan atau minuman ke dalam ruang lab komputer?",
+                coreConcepts: ["tumpah", "air", "korsleting", "semut", "rusak"],
+                ideal: "Tumpahan cairan memicu korsleting listrik dan mengundang hama perusak."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Apa arti rambu keselamatan kerja berbentuk segitiga dengan latar warna kuning?",
+                coreConcepts: ["awas", "peringatan", "bahaya", "hati", "risiko"],
+                ideal: "Rambu peringatan (Warning) atas potensi bahaya di area tersebut."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Prosedur penutupan shift lab yang benar oleh tim piket sebelum meninggalkan ruangan?",
+                coreConcepts: ["matikan", "pc", "cabut", "listrik", "kunci", "bersih"],
+                ideal: "Mematikan PC, cabut saklar utama, matikan lampu/AC, dan mengunci pintu."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Bahaya apa yang ditimbulkan jika kabel LAN melintang di lantai tanpa pelindung (cable protector)?",
+                coreConcepts: ["tersandung", "trip", "hazard", "injak", "jatuh"],
+                ideal: "Menimbulkan bahaya tersandung (trip hazard) yang mencederai fisik orang lewat."
+            },
+            {
+                modul: "Darurat & SOP",
+                kasus: "Mengapa pemahaman K3LH menjadi syarat mutlak wajib bagi siswa TJKT sebelum terjun PKL?",
+                coreConcepts: ["nyawa", "selamat", "industri", "profesional", "kerja", "aman"],
+                ideal: "Keselamatan jiwa adalah prioritas utama industri; teknisi profesional wajib mengutamakan keselamatan."
+            }
+        ];
+
+        let currentIndex = 0;
+        let totalScoreAccumulator = 0;
+        let studentName = "";
+
+        function startSimulation() {
+            const nameInput = document.getElementById('studentName').value.trim();
+            if (!nameInput) {
+                alert("Masukkan nama siswa terlebih dahulu!");
+                return;
+            }
+            studentName = nameInput;
+            document.getElementById('startScreen').classList.remove('active');
+            document.getElementById('quizScreen').classList.add('active');
+            document.getElementById('statsBar').style.display = 'grid';
+            loadCurrentScenario();
+        }
+
+        function loadCurrentScenario() {
+            if (currentIndex >= databaseKasus.length) {
+                showFinalResult();
+                return;
+            }
+            const current = databaseKasus[currentIndex];
+            document.getElementById('currentCaseNum').innerText = `${currentIndex + 1} / ${databaseKasus.length}`;
+            document.getElementById('caseModule').innerText = current.modul;
+            document.getElementById('scenarioText').innerText = current.kasus;
+            document.getElementById('userAnswerInput').value = "";
+        }
+
+        function submitAnswer() {
+            const userText = document.getElementById('userAnswerInput').value.trim();
+            if (!userText) {
+                alert("Tuliskan tindakan K3LH versimu terlebih dahulu!");
+                return;
+            }
+
+            // AI Semantic Concept Evaluator (Tidak kaku, mendeteksi kedekatan konsep)
+            const current = databaseKasus[currentIndex];
+            const lowerUserText = userText.toLowerCase();
+            
+            let matchCount = 0;
+            current.coreConcepts.forEach(concept => {
+                if (lowerUserText.includes(concept)) {
+                    matchCount++;
+                }
+            });
+
+            // Hitung skor berdasarkan persentase konsep penting yang disentuh
+            let conceptScore = (matchCount / current.coreConcepts.length) * 70;
+            
+            // Tambahkan bonus jika panjang teks deskriptif dan masuk akal (> 15 kata)
+            let lengthBonus = lowerUserText.split(' ').length >= 5 ? 30 : 15;
+            
+            let finalScore = Math.min(100, Math.round(conceptScore + lengthBonus));
+            if (matchCount === 0) finalScore = Math.max(15, finalScore - 20); // Penalti jika melenceng jauh
+
+            totalScoreAccumulator += finalScore;
+
+            // Tampilkan Modal Evaluasi AI
+            let aiTitle = "";
+            let aiMsg = "";
+            if (finalScore >= 70) {
+                aiTitle = `🟢 AI Score: ${finalScore}/100 (Sangat Revan & Aman)`;
+                aiMsg = `Logika tindakanmu sudah sesuai standar K3LH industri. Konsep intinya tepat.<br><br><b>Standar Ideal:</b> ${current.ideal}`;
+            } else if (finalScore >= 40) {
+                aiTitle = `🟡 AI Score: ${finalScore}/100 (Cukup, Perlu Ketelitian)`;
+                aiMsg = `Jawabanmu mendekati, tapi kurang spesifik pada prosedur teknis keselamatan.<br><br><b>Standar Ideal:</b> ${current.ideal}`;
+            } else {
+                aiTitle = `🔴 AI Score: ${finalScore}/100 (Berisiko / Bahaya)`;
+                aiMsg = `Tindakan tersebut mengabaikan aspek K3LH dan berisiko memicu kecelakaan kerja!<br><br><b>Standar Ideal:</b> ${current.ideal}`;
+            }
+
+            document.getElementById('modalTitle').innerHTML = aiTitle;
+            document.getElementById('modalDesc').innerHTML = aiMsg;
+            document.getElementById('aiModal').style.display = 'flex';
+        }
+
+        function nextScenario() {
+            document.getElementById('aiModal').style.display = 'none';
+            currentIndex++;
+            loadCurrentScenario();
+            // Update live average score
+            let avg = Math.round(totalScoreAccumulator / currentIndex);
+            document.getElementById('currentScore').innerText = avg;
+        }
+
+        function showFinalResult() {
+            document.getElementById('quizScreen').classList.remove('active');
+            document.getElementById('statsBar').style.display = 'none';
+            document.getElementById('endScreen').classList.add('active');
+
+            const finalAvg = Math.round(totalScoreAccumulator / databaseKasus.length);
+            document.getElementById('endTitle').innerText = `Evaluasi Selesai: ${studentName}`;
+            
+            let desc = `Rata-rata Skor K3LH AI: ${finalAvg} / 100<br><br>`;
+            if (finalAvg >= 75) {
+                desc += "🏆 <b>Predikat: Ahli K3LH Utama TJKT!</b> Pemahaman analisismu sangat matang dan siap menghadapi dunia industri.";
+            } else if (finalAvg >= 50) {
+                desc += "🥈 <b>Predikat: Teknisi Cukup Aware.</b> Perlu memperdalam ketelitian prosedur mitigasi darurat.";
+            } else {
+                desc += "⚠️ <b>Predikat: Perlu Pembinaan Ulang.</b> Sering mengabaikan aspek keselamatan dasar di jaringan.";
+            }
+            document.getElementById('endDesc').innerHTML = desc;
+        }
+    </script>
+</body>
+</html>
